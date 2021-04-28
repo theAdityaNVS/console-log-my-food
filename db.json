@@ -129,6 +129,13 @@
             "servingSize": "2.5",
             "calories": 460
           }
+        },
+        {
+          "1619635457843": {
+            "food": "apple",
+            "servingSize": "3",
+            "calories": 264
+          }
         }
       ]
     }
