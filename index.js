@@ -11,19 +11,24 @@ readline.on('line', async line => {
     case 'list vegan foods':
       {
         const { data } = await axios.get(`http://localhost:3001/food`);
-        function* listVeganFoods(){
+        function* listVeganFoods() {
+          try {
             let idx = 0;
             const veganOnly = data.filter(food =>
-                food.dietary_preferences.includes('vegan'),
+              food.dietary_preferences.includes('vegan'),
             );
-            while(veganOnly[idx]) {
-                yield veganOnly[idx];
-                idx++;
+            while (veganOnly[idx]) {
+              yield veganOnly[idx];
+              idx++;
             }
+          } catch (error) {
+            console.log('Something went wrong while listing vegan items', {
+              error,
+            });
+          }
         }
-
         for (let val of listVeganFoods()) {
-        console.log(val.name);
+          console.log(val.name);
         }
         readline.prompt();
       }
@@ -34,9 +39,13 @@ readline.on('line', async line => {
       let actionIt;
 
       function* actionGenerator() {
+        try {
           const food = yield;
           const servingSize = yield askForServingSize();
           yield displayCalories(servingSize, food);
+        } catch (error) {
+          console.log({ error });
+        }
       }
 
       function askForServingSize() {
@@ -45,6 +54,8 @@ readline.on('line', async line => {
           servingSize => {
             if (servingSize === 'nevermind' || servingSize === 'n') {
               actionIt.return();
+            } else if (typeof servingSize !== 'number' || servingSize === NaN) {
+              actionIt.throw('Please, numbers only');
             } else {
               actionIt.next(servingSize);
             }
@@ -105,6 +116,48 @@ readline.on('line', async line => {
         readline.prompt();
       });
       break;
+    case `today's log`:
+      readline.question('Email: ', async emailAddress => {
+        const { data } = await axios.get(
+          `http://localhost:3001/users?email=${emailAddress}`,
+        );
+        const foodLog = data[0].log || [];
+        let totalCalories = 0;
+        function* getFoodLog() {
+          try {
+            yield* foodLog;
+          } catch (error) {
+            console.log('Error reading the food log', { error });
+          }
+        }
+        const logIterator = getFoodLog();
+        for (const entry of logIterator) {
+          const timestamp = Object.keys(entry)[0];
+          if (isToday(new Date(Number(timestamp)))) {
+            console.log(
+              `${entry[timestamp].food}, ${entry[timestamp].servingSize} serving(s)`,
+            );
+            totalCalories += entry[timestamp].calories;
+            if (totalCalories >= 12000) {
+              console.log(`Impressive! You've reached 12,000 calories`);
+              logIterator.return();
+            }
+          }
+        }
+        console.log('---------------');
+        console.log(`Total Calories: ${totalCalories}`);
+        readline.prompt();
+      });
+      break;
   }
   readline.prompt();
 });
+
+function isToday(timestamp) {
+  const today = new Date();
+  return (
+    timestamp.getDate() === today.getDate() &&
+    timestamp.getMonth() === today.getMonth() &&
+    timestamp.getFullYear() === today.getFullYear()
+  );
+}
